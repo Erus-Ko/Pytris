@@ -4,219 +4,239 @@ import pygame
 import random
 import copy
 
-WHITE = (255, 255, 255)
-BLACK = (  0,   0,   0)
+# ========== CONSTANT_INITIALIZATIONS ========== #
 
-# Tetromino Colors
-I_COLOR = (  4, 165, 229)
-J_COLOR = ( 30, 102, 245)
-L_COLOR = (254, 100,  11)
-O_COLOR = (223, 142,  29)
-S_COLOR = ( 64, 160,  43)
-Z_COLOR = (210,  15,  57)
-T_COLOR = (136,  57, 239)
 ACTIVE_IDS = {"I", "J", "L", "O", "S", "Z", "T"}
 
-width = 10
-height = 40
-magnify = 30
+# ========== variable_initializations ========== #
 
-pivot = [0, 0]
+magnify = 20
 
-def setMatrixElement(point, identity):
-    matrix[40 - point[1]][point[0] - 1] = identity
+# ========== ClassDefinitions ========== #
+
+class Bagger:
+    def __init__(self):
+        self.bag = ACTIVE_IDS
+
+class AutoDropper:
+    def __init__(self):
+        self.progress = 0
+    def drop(self, gravity):
+        self.progress += gravity
+        while self.progress > 0:
+            self.progress -= 1
+            drop()
+
+# ========== functionDefinitions ========== #
+
+def mapper(x, y):
+    return [x - 1, 40 - y]
+
+def constructField(width = 10, height = 40):
+    global field
+    field = []
+    for y in range(height):
+        line = []
+        for x in range(width):
+            line.append(0)
+        field.append(line)
+
+def setMatrixElement(selection, coord, identity):
+    selection[coord[1]][coord[0]] = identity
+
+def count(selection):
+    count = 40
+    for y in selection:
+        count -= y.count(0)
+    return count
+
+def block(selection):
+    for y in range(len(selection)):
+        for x in range(len(selection[y])):
+            if selection[y][x] in ACTIVE_IDS:
+                selection[y][x] = selection[y][x].lower()
 
 def spawnTetromino(shape):
     global pivot
+    
+    before = count(field)
+
     match shape:
         case "I": # Too Low
-            setMatrixElement([4, 21], shape)
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([7, 21], shape)
-            pivot = [1, 20]
+            setMatrixElement(field, mapper(4, 21), shape)
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(7, 21), shape)
+            pivot = mapper(5.5, 20.5)
         case "J":
-            setMatrixElement([4, 21], shape)
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([4, 22], shape)
-            pivot = [5, 21]
+            setMatrixElement(field, mapper(4, 21), shape)
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(4, 22), shape)
         case "L":
-            setMatrixElement([4, 21], shape)
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([6, 22], shape)
-            pivot = [5, 21]
-        case "O": # Too Low
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([5, 22], shape)
-            setMatrixElement([6, 22], shape)
-            pivot = [5.5, 21.5]
+            setMatrixElement(field, mapper(4, 21), shape)
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(6, 22), shape)
+        case "O":
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(5, 22), shape)
+            setMatrixElement(field, mapper(6, 22), shape)
         case "S":
-            setMatrixElement([4, 21], shape)
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([5, 22], shape)
-            setMatrixElement([6, 22], shape)
-            pivot = [5, 21]
+            setMatrixElement(field, mapper(4, 21), shape)
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(5, 22), shape)
+            setMatrixElement(field, mapper(6, 22), shape)
         case "Z":
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([4, 22], shape)
-            setMatrixElement([5, 22], shape)
-            pivot = [5, 21]
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(4, 22), shape)
+            setMatrixElement(field, mapper(5, 22), shape)
         case "T":
-            setMatrixElement([4, 21], shape)
-            setMatrixElement([5, 21], shape)
-            setMatrixElement([6, 21], shape)
-            setMatrixElement([5, 22], shape)
-            pivot = [5, 21]
-    fall()
+            setMatrixElement(field, mapper(4, 21), shape)
+            setMatrixElement(field, mapper(5, 21), shape)
+            setMatrixElement(field, mapper(6, 21), shape)
+            setMatrixElement(field, mapper(5, 22), shape)
+            pivot = mapper(5, 21)
 
-def spawnRandom():
-    index = random.randrange(7)
-    spawnTetromino(list(ACTIVE_IDS)[index])
+    if before + 4 != count(field):
+        print("DEAD")
+    #drop()
 
-def countMinos(chosenMatrix):
-    count = 0
-    for y in range(len(chosenMatrix)):
-        for x in range(len(chosenMatrix[y])):
-            if chosenMatrix[y][x]:
-                count += 1
-    return count
-
-def rotate(direction):
-    global matrix
+def rotateTetromino(direction):
     global pivot
-    buffer = copy.deepcopy(matrix)
-    minosBefore = countMinos(matrix)
+    global field
     
-    for y in range(len(buffer)):
-        for x in range(len(buffer[y])):
-            if buffer[y][x] in ACTIVE_IDS:
-                buffer[y + 1][x] = buffer[y][x]
-                buffer[y][x] = 0
-
-def killMinos():
-    global matrix
-    count = 0
-    for y in range(len(matrix)):
-        for x in range(len(matrix[y])):
-            if matrix[y][x] in ACTIVE_IDS:
-                matrix[y][x] = matrix[y][x].lower()
-
-def fall():
-    global matrix
-    buffer = copy.deepcopy(matrix)
-    minosBefore = countMinos(matrix)
+    buffer_matrix = copy.deepcopy(field)
+    before = count(buffer_matrix)
+    points = []
     
-    for y in range(len(buffer) - 1, 0, -1):
-        for x in range(len(buffer[y])):
-            if buffer[y][x] and y < 39 and matrix[y][x] in ACTIVE_IDS:
-                buffer[y + 1][x] = buffer[y][x]
-                buffer[y][x] = 0
+    for y in range(len(buffer_matrix)):
+        for x in range(len(buffer_matrix[y])):
+            if buffer_matrix[y][x] in ACTIVE_IDS:
+                points.append((x - pivot[0], y - pivot[1], buffer_matrix[y][x]))
+                buffer_matrix[y][x] = 0
                 
-    matrixBefore = copy.deepcopy(matrix)
-    
-    if minosBefore == countMinos(buffer):
-        matrix = copy.deepcopy(buffer)
-        pivot[1] += 1
-    if matrixBefore == matrix:
-        killMinos()
-        spawnRandom()
+    match direction:
+        case "ccw":
+            for i in points:
+                newX = pivot[0] + i[1]
+                newY = pivot[1] - i[0]
+                if -1 < newX < 10 and -1 < newY < 40:
+                    buffer_matrix[int(newY)][int(newX)] = i[2]
+        case "cw":
+            for i in points:
+                newX = pivot[0] - i[1]
+                newY = pivot[1] + i[0]
+                if -1 < newX < 10 and -1 < newY < 40:
+                    buffer_matrix[int(newY)][int(newX)] = i[2]
+                
+    if before == count(buffer_matrix):
+        field = buffer_matrix
+    else:
+        pass # Check every the spot above every each Mino: If it's empty or another Mino (NOT BLOCK), move them up by one, then check if we've lost any and push up by one. Do this twice.
 
-def move(direction):
-    global matrix
-    buffer = copy.deepcopy(matrix)
-    minosBefore = countMinos(matrix)
+def moveTetromino(direction):
+    global field
+    
+    buffer_matrix = copy.deepcopy(field)
+    before = count(buffer_matrix)
+                
     match direction:
         case "left":
-            for y in range(len(buffer)):
-                for x in range(len(buffer[y])):
-                    if buffer[y][x] in ACTIVE_IDS and x - 1 > -1:
-                        buffer[y][x - 1] = buffer[y][x]
-                        buffer[y][x] = 0
-            
-            if minosBefore == countMinos(buffer):
-                matrix = copy.deepcopy(buffer)
+            for y in range(len(buffer_matrix)):
+                for x in range(len(buffer_matrix[y])):
+                    if buffer_matrix[y][x] in ACTIVE_IDS and x > 0:
+                        buffer_matrix[y][x - 1] = buffer_matrix[y][x]
+                        buffer_matrix[y][x] = 0
+            pivot[0] -= 1
         case "right":
-            for y in range(len(buffer)):
-                for x in range(len(buffer[y]) - 1, -1, -1):
-                    if buffer[y][x] in ACTIVE_IDS and x < 9:
-                        buffer[y][x + 1] = buffer[y][x]
-                        buffer[y][x] = 0
-            
-            if minosBefore == countMinos(buffer):
-                matrix = copy.deepcopy(buffer)
+            for y in range(len(buffer_matrix)):
+                for x in range(len(buffer_matrix[y]) - 1, -1, -1):
+                    if buffer_matrix[y][x] in ACTIVE_IDS and x < 9:
+                        buffer_matrix[y][x + 1] = buffer_matrix[y][x]
+                        buffer_matrix[y][x] = 0
+            pivot[0] += 1
+                
+    if before == count(buffer_matrix):
+        field = buffer_matrix
 
-def getColor(ids):
-    match ids.upper():
-        case "I":
-            return I_COLOR
-        case "J":
-            return J_COLOR
-        case "L":
-            return L_COLOR
-        case "O":
-            return O_COLOR
-        case "S":
-            return S_COLOR
-        case "Z":
-            return Z_COLOR
-        case "T":
-            return T_COLOR
+def drop():
+    global field
+    
+    buffer_matrix = copy.deepcopy(field)
+    before = count(buffer_matrix)
+    
+    for y in range(len(buffer_matrix) - 1, -1, -1):
+        for x in range(len(buffer_matrix[y])):
+            if buffer_matrix[y][x] in ACTIVE_IDS and y < 39:
+                buffer_matrix[y + 1][x] = buffer_matrix[y][x]
+                buffer_matrix[y][x] = 0
+    pivot[1] += 1
+    
+    if buffer_matrix == field:
+        block(buffer_matrix)
+        field = buffer_matrix
+    elif before == count(buffer_matrix):
+        field = buffer_matrix
 
-def drawBoard():
-    for y in range(len(matrix)):
-        for x in range(len(matrix[y])):
-            if matrix[y][x] != 0:
-                pygame.draw.rect(screen, getColor(matrix[y][x]), [0 + (magnify * (x + 5)), 0 + (magnify * (y - 19)), magnify, magnify])
-    pygame.draw.rect(screen, (192, 192, 192), [0, 0, 5 * magnify, screen.get_size()[1]])
-    pygame.draw.rect(screen, (192, 192, 192), [15 * magnify, 0, 5 * magnify, screen.get_size()[1]])
-    pygame.draw.rect(screen, (128, 128, 128), [0, 0, 20 * magnify, magnify * 0.75])
-    pygame.draw.circle(screen, BLACK, [0 + (magnify * (pivot[0] + 4)), 0 + (magnify * (pivot[1] - 18))], 5)
+def hardDrop():
+    pass
+
+def printMatrix(selection):
+    matrix = "╭────────────────────╮\n"
+    for y in range(len(selection)):
+        line = ""
+        for x in range(len(selection[y])):
+            char = " "
+            if selection[y][x] in ACTIVE_IDS:
+                char = "█"
+            elif selection[y][x]:
+                char = "▒"
+            line += char + char
+        matrix += "│" + line + "│" + "\n"
+    matrix += "╰────────────────────╯"
+    print(matrix)
+
+# ========== Pre-Loop Code ========== #
+
+constructField()
 
 pygame.init()
-screen = pygame.display.set_mode((20 * magnify, 21 * magnify))
-pygame.display.set_caption("Pytris")
+
+display = pygame.display.set_mode([20 * magnify, 21 * magnify])
 clock = pygame.time.Clock()
+fps = 60
 done = False
 
-matrix = []
-for y in range(height):
-    line = []
-    for x in range(width):
-        line.append(0)
-    matrix.append(line)
+auto_drop = AutoDropper()
 
-spawnRandom()
-setMatrixElement([1, 1], "i")
-setMatrixElement([1, 2], "i")
-setMatrixElement([4, 2], "i")
+G = 5
+
+# ========== Game Loop Code ========== #
 
 while not done:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                fall()
-            if event.key == pygame.K_a:
-                move("left")
-            if event.key == pygame.K_d:
-                move("right")
-            if event.key == pygame.K_q:
-                rotate("left")
-            if event.key == pygame.K_e:
-                rotate("right")
-            if event.key == pygame.K_RETURN:
-                killMinos()
+            if event.key in {pygame.K_w, pygame.K_UP}:
+                hardDrop()
+            if event.key in {pygame.K_s, pygame.K_DOWN}:
+                drop()
+            if event.key in {pygame.K_a, pygame.K_LEFT}:
+                moveTetromino("left")
+            if event.key in {pygame.K_d, pygame.K_RIGHT}:
+                moveTetromino("right")
+            if event.key in {pygame.K_q}:
+                rotateTetromino("ccw")
+            if event.key in {pygame.K_e}:
+                rotateTetromino("cw")
+    
+    auto_drop.drop(G)
 
-    screen.fill(WHITE)
-
-    drawBoard()
-
-    pygame.display.flip()
-
-    clock.tick(60)
+    printMatrix(field)
+    
+    clock.tick(fps)
 pygame.quit()
